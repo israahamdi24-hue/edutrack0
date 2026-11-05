@@ -1,6 +1,9 @@
-
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../core/errors/auth_error_message.dart';
 import '../core/validators/auth_validators.dart';
+import '../controllers/auth_controller.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/auth_header.dart';
 import '../widgets/primary_button.dart';
@@ -9,39 +12,70 @@ class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
 
   @override
-  State<ForgotPasswordScreen> createState() =>
-      _ForgotPasswordScreenState();
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _ForgotPasswordScreenState
-    extends State<ForgotPasswordScreen> {
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  final _authController = AuthController();
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _authController.addListener(_syncAuthState);
+  }
+
+  void _syncAuthState() {
+    if (mounted && _isLoading != _authController.isLoading) {
+      setState(() => _isLoading = _authController.isLoading);
+    }
+  }
 
   @override
   void dispose() {
+    _authController.removeListener(_syncAuthState);
+    _authController.dispose();
     _emailController.dispose();
     super.dispose();
   }
 
-  void _sendResetLink() {
+  Future<void> _sendResetLink() async {
     if (!_formKey.currentState!.validate()) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Interface prête : l’envoi du lien sera connecté à Firebase.',
-        ),
-      ),
-    );
+    try {
+      await _authController.sendPasswordReset(_emailController.text);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Si un compte correspond à cette adresse, un lien '
+              'de réinitialisation a été envoyé.',
+            ),
+          ),
+        );
+      }
+    } on FirebaseAuthException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error.code == 'user-not-found'
+                  ? 'Si un compte correspond à cette adresse, un lien '
+                        'de réinitialisation a été envoyé.'
+                  : authErrorMessage(error),
+            ),
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        leading: const BackButton(),
-      ),
+      appBar: AppBar(leading: const BackButton()),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -70,14 +104,13 @@ class _ForgotPasswordScreenState
                     ),
                     const SizedBox(height: 24),
                     PrimaryButton(
-                      label: 'Envoyer le lien',
+                      label: _isLoading ? 'Envoi...' : 'Envoyer le lien',
                       icon: Icons.send_rounded,
-                      onPressed: _sendResetLink,
+                      onPressed: _isLoading ? null : _sendResetLink,
                     ),
                     const SizedBox(height: 12),
                     const Text(
-                      'Vérifiez votre boîte de réception après '
-                      'la mise en place du service.',
+                      'Un email de réinitialisation sera envoyé à cette adresse.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 12,

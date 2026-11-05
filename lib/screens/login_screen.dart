@@ -1,13 +1,16 @@
-
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
 import '../core/constants/app_colors.dart';
+import '../core/errors/auth_error_message.dart';
 import '../core/validators/auth_validators.dart';
+import '../controllers/auth_controller.dart';
+import '../services/auth_service.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/auth_header.dart';
 import '../widgets/primary_button.dart';
 import 'forgot_password_screen.dart';
 import 'register_screen.dart';
-import 'role_selection_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,45 +20,72 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final _authController = AuthController();
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
   bool _hidePassword = true;
-  bool _rememberMe = true;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _authController.addListener(_syncAuthState);
+  }
+
+  void _syncAuthState() {
+    if (mounted && _isLoading != _authController.isLoading) {
+      setState(() => _isLoading = _authController.isLoading);
+    }
+  }
 
   @override
   void dispose() {
+    _authController.removeListener(_syncAuthState);
+    _authController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  void _login() {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _login() async {
+    if (_isLoading || !_formKey.currentState!.validate()) return;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Mode démonstration : Firebase sera connecté ensuite.',
-        ),
-      ),
-    );
+    try {
+      await _authController.signIn(
+        email: _emailController.text,
+        password: _passwordController.text,
+      );
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } on FirebaseAuthException catch (error) {
+      _showError(authErrorMessage(error));
+    } on FirebaseException catch (error) {
+      _showError(
+        'Impossible de charger votre profil Firebase (${error.code}).',
+      );
+    } on UserProfileNotFoundException catch (error) {
+      _showError(error.toString());
+    } on UnauthorizedAccountException catch (error) {
+      _showError(error.message);
+    } on FormatException catch (error) {
+      _showError(error.message);
+    } on StateError catch (error) {
+      _showError(error.message);
+    }
+  }
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const RoleSelectionScreen(),
-      ),
-    );
+  void _showError(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        leading: const BackButton(),
-      ),
+      appBar: AppBar(leading: const BackButton()),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -69,8 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     const AuthHeader(
                       title: 'Bon retour !',
-                      subtitle:
-                          'Connectez-vous pour continuer votre parcours.',
+                      subtitle: 'Connectez-vous pour continuer votre parcours.',
                     ),
                     const SizedBox(height: 30),
                     AppTextField(
@@ -102,52 +131,33 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: _rememberMe,
-                          activeColor: AppColors.primary,
-                          onChanged: (value) {
-                            setState(() {
-                              _rememberMe = value ?? false;
-                            });
-                          },
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const ForgotPasswordScreen(),
+                            ),
+                          );
+                        },
+                        child: const Text(
+                          'Mot de passe oublié ?',
+                          style: TextStyle(fontSize: 12),
                         ),
-                        const Expanded(
-                          child: Text(
-                            'Se souvenir de moi',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const ForgotPasswordScreen(),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            'Mot de passe oublié ?',
-                            style: TextStyle(fontSize: 12),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     PrimaryButton(
-                      label: 'Se connecter',
+                      label: _isLoading ? 'Connexion...' : 'Se connecter',
                       icon: Icons.arrow_forward_rounded,
-                      onPressed: _login,
+                      onPressed: _isLoading ? null : _login,
                     ),
                     const SizedBox(height: 22),
                     const Row(
                       children: [
-                        Expanded(
-                          child: Divider(color: AppColors.border),
-                        ),
+                        Expanded(child: Divider(color: AppColors.border)),
                         Padding(
                           padding: EdgeInsets.symmetric(horizontal: 12),
                           child: Text(
@@ -158,9 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                        Expanded(
-                          child: Divider(color: AppColors.border),
-                        ),
+                        Expanded(child: Divider(color: AppColors.border)),
                       ],
                     ),
                     const SizedBox(height: 18),
@@ -178,9 +186,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: OutlinedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 54),
                         foregroundColor: AppColors.primary,
-                        side: const BorderSide(
-                          color: AppColors.border,
-                        ),
+                        side: const BorderSide(color: AppColors.border),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
                         ),

@@ -1,0 +1,10 @@
+export 'models/student_course.dart';
+export 'models/student_dashboard_data.dart';
+export 'screens/student_attendance_screen.dart';
+export 'screens/student_courses_screen.dart';
+export 'screens/student_dashboard_screen.dart';
+export 'screens/student_notifications_screen.dart';
+export 'screens/student_profile_screen.dart';
+export 'screens/student_qr_attendance_screen.dart';
+export 'services/student_attendance_qr_service.dart';
+export 'services/student_dashboard_service.dart';
