@@ -37,8 +37,9 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   }
 
   void _reload() {
+    final dashboard = _repository.load(widget.user);
     setState(() {
-      _dashboard = _repository.load(widget.user);
+      _dashboard = dashboard;
     });
   }
 

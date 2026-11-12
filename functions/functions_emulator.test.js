@@ -108,6 +108,31 @@ test('teacher issues a signed QR and the student records attendance once', async
   );
 });
 
+test('admin starts an assigned session QR and an enrolled student can scan it', async () => {
+  const startsAt = Timestamp.fromMillis(Date.now() - 1000);
+  await adminDb.collection('sessions').doc('admin-session-1').set({
+    courseId: 'course-1',
+    teacherUid: teacher.uid,
+    startsAt,
+  });
+
+  const qr = await callable(admin, 'generateSessionQr', {
+    sessionId: 'admin-session-1',
+  });
+  assert.equal(typeof qr.data.qrPayload, 'string');
+  assert.equal(qr.data.expiresAt, startsAt.toMillis() + 15 * 60 * 1000);
+
+  const response = await callable(student, 'recordStudentAttendance', {
+    qrPayload: qr.data.qrPayload,
+  });
+  assert.equal(response.data.success, true);
+  const attendance = await adminDb
+    .collection('attendance')
+    .doc(`${student.uid}_admin-session-1`)
+    .get();
+  assert.equal(attendance.data().status, 'present');
+});
+
 test('invalid, expired, missing-session, and un-enrolled scans are rejected', async () => {
   await assert.rejects(
     callable(student, 'recordStudentAttendance', { qrPayload: 'not-a-qr' }),

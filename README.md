@@ -33,6 +33,30 @@ Pour lancer l’application après la configuration :
 flutter run
 ```
 
+## Gestion des cours et des séances
+
+Dans **Administration > Cours, inscriptions et séances**, un administrateur
+peut créer et modifier les cours, affecter un enseignant, inscrire plusieurs
+étudiants à la fois et consulter ou retirer une inscription. Un cours ne peut
+être supprimé que s’il ne possède plus d’inscriptions, de séances ni de
+pointages; supprimez d’abord les inscriptions et les séances sans historique.
+Les comptes enseignant et administrateur doivent être provisionnés dans un
+environnement de confiance avant d’être utilisés.
+
+Dans l’espace Enseignant, les cours affectés et les étudiants inscrits sont
+chargés depuis Firestore et la fonction `getEnrolledStudents`. L’enseignant
+peut créer, modifier et supprimer ses séances, en choisissant le début et la
+fin; les deux valeurs sont enregistrées comme `Timestamp` dans `sessions`.
+L’interface Étudiant ne montre que les cours inscrits activement, leurs séances
+et l’historique de présence. Les écrans proposent une actualisation après les
+opérations et un bouton de rechargement.
+
+Le modèle actuel ne comporte ni titre de séance ni champ d’approbation. La
+création et la modification n’ajoutent donc pas de tels champs; le QR signé
+reste émis par `generateSessionQr` uniquement pendant la fenêtre serveur de
+15 minutes à compter du début. Aucune écriture de présence n’est autorisée
+depuis l’application cliente.
+
 ## Module Étudiant — contrat Firestore
 
 Les écrans Étudiant utilisent les collections et champs suivants. Les cours,
@@ -71,11 +95,16 @@ firebase deploy --only firestore:rules
 
 Le client Flutter appelle une fonction callable nommée
 `recordStudentAttendance` avec `{ "qrPayload": "<contenu brut du QR>" }`. Le QR
-doit contenir un jeton opaque signé ou aléatoire, créé par le service
-Enseignant; il ne constitue jamais à lui seul une preuve de présence.
+doit contenir un jeton opaque signé ou aléatoire, créé par le service de
+l’Enseignant ou de l’Administrateur; il ne constitue jamais à lui seul une
+preuve de présence.
 
 `functions/` contient `recordStudentAttendance`, `generateSessionQr` et
-`getEnrolledStudents`. Le QR est signé côté serveur avec une clé conservée dans
+`getEnrolledStudents`. Depuis l’onglet **Séances** de l’espace Administration,
+le bouton QR démarre une séance planifiée immédiatement (en conservant sa durée)
+et affiche le code signé; une séance déjà commencée peut aussi être ouverte
+pendant sa fenêtre de pointage. Cette action exige le rôle admin et son custom
+claim Firebase. Le QR est signé côté serveur avec une clé conservée dans
 Secret Manager; aucun champ QR public ni nouvelle collection n’est ajouté à
 `sessions`. Le serveur vérifie le rôle, la signature, l’inscription active et
 la fenêtre `startsAt <= serverNow < startsAt + 15 minutes`, puis écrit

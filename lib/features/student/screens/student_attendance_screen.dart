@@ -51,7 +51,13 @@ class _StudentAttendanceScreenState extends State<StudentAttendanceScreen> {
     );
   }
 
-  void _reload() => setState(() => _data = _load());
+  void _reload() {
+    final data = _load();
+    if (!mounted) return;
+    setState(() {
+      _data = data;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

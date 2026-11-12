@@ -114,6 +114,29 @@ test('teachers can access their assigned course and create only its sessions', a
   }));
 });
 
+test('admins can create and reschedule sessions for their assigned courses', async () => {
+  const db = environment.authenticatedContext('admin-1', { admin: true }).firestore();
+  const sessionRef = doc(db, 'sessions/admin-session');
+  const startsAt = new Date(Date.now() + 60_000);
+  const endsAt = new Date(startsAt.getTime() + 60 * 60 * 1000);
+
+  await assertSucceeds(setDoc(sessionRef, {
+    courseId: 'course-1',
+    teacherUid: 'teacher-1',
+    startsAt,
+    endsAt,
+  }));
+  await assertSucceeds(updateDoc(sessionRef, {
+    startsAt: new Date(Date.now()),
+    endsAt: new Date(Date.now() + 60 * 60 * 1000),
+  }));
+  await assertFails(setDoc(doc(db, 'sessions/wrong-teacher'), {
+    courseId: 'course-1',
+    teacherUid: 'teacher-2',
+    startsAt,
+  }));
+});
+
 test('admin access depends on the custom claim', async () => {
   const claimedAdmin = environment.authenticatedContext('admin-1', { admin: true }).firestore();
   const roleOnlyAdmin = environment.authenticatedContext('admin-1').firestore();

@@ -123,7 +123,9 @@ class TeacherDataService {
       final room = data['room'];
       if ((endsAt != null && endsAt is! Timestamp) ||
           (room != null && room is! String)) {
-        throw FormatException('La séance ${document.id} contient des champs invalides.');
+        throw FormatException(
+          'La séance ${document.id} contient des champs invalides.',
+        );
       }
       result.add(
         TeacherSession(
@@ -193,8 +195,12 @@ class TeacherDataService {
       throw const FormatException('La réponse étudiant est invalide.');
     }
     return rawStudents.map((raw) {
-      if (raw is! Map || raw['uid'] is! String || raw['displayName'] is! String) {
-        throw const FormatException('Le profil étudiant retourné est invalide.');
+      if (raw is! Map ||
+          raw['uid'] is! String ||
+          raw['displayName'] is! String) {
+        throw const FormatException(
+          'Le profil étudiant retourné est invalide.',
+        );
       }
       return EnrolledStudent(
         uid: raw['uid'] as String,
@@ -211,6 +217,7 @@ class TeacherDataService {
     DateTime? endsAt,
     String? room,
   }) async {
+    _validateSessionTimes(startsAt, endsAt);
     final data = <String, dynamic>{
       'courseId': courseId,
       'teacherUid': teacherUid,
@@ -228,10 +235,15 @@ class TeacherDataService {
     DateTime? endsAt,
     String? room,
   }) async {
+    _validateSessionTimes(startsAt, endsAt);
     await _firestore.collection('sessions').doc(session.id).update({
       'startsAt': Timestamp.fromDate(startsAt),
-      'endsAt': endsAt == null ? FieldValue.delete() : Timestamp.fromDate(endsAt),
-      'room': room == null || room.trim().isEmpty ? FieldValue.delete() : room.trim(),
+      'endsAt': endsAt == null
+          ? FieldValue.delete()
+          : Timestamp.fromDate(endsAt),
+      'room': room == null || room.trim().isEmpty
+          ? FieldValue.delete()
+          : room.trim(),
       'teacherUid': teacherUid,
       'courseId': session.courseId,
     });
@@ -242,9 +254,19 @@ class TeacherDataService {
         .collection('attendance')
         .where('courseId', isEqualTo: session.courseId)
         .get();
-    if (attendance.docs.any((document) => document.data()['sessionId'] == session.id)) {
-      throw StateError('Cette séance possède des pointages et ne peut pas être supprimée.');
+    if (attendance.docs.any(
+      (document) => document.data()['sessionId'] == session.id,
+    )) {
+      throw StateError(
+        'Cette séance possède des pointages et ne peut pas être supprimée.',
+      );
     }
     await _firestore.collection('sessions').doc(session.id).delete();
+  }
+
+  void _validateSessionTimes(DateTime startsAt, DateTime? endsAt) {
+    if (endsAt != null && !endsAt.isAfter(startsAt)) {
+      throw ArgumentError('L’heure de fin doit être postérieure au début.');
+    }
   }
 }

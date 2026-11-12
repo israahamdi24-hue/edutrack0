@@ -32,22 +32,20 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
   }
 
   void _reload() {
+    final courses = _service.loadCourses(widget.user);
     setState(() {
-      _courses = _service.loadCourses(widget.user);
+      _courses = courses;
       _expandedCourseId = null;
       _details = null;
     });
   }
 
   void _toggleCourse(StudentCourse course) {
+    final expandedCourseId = _expandedCourseId == course.id ? null : course.id;
+    final details = expandedCourseId == null ? null : _loadDetails(course);
     setState(() {
-      if (_expandedCourseId == course.id) {
-        _expandedCourseId = null;
-        _details = null;
-      } else {
-        _expandedCourseId = course.id;
-        _details = _loadDetails(course);
-      }
+      _expandedCourseId = expandedCourseId;
+      _details = details;
     });
   }
 
